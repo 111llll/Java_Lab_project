@@ -529,84 +529,8 @@ private void removeCardsFromTableau(List<Card> cards) {
     }
 }
 
-private void moveWasteToFoundation(int index) {
-    if (wastePile.isEmpty()) return;
 
-    Card card = wastePile.peek(); // 先看不是先 pop
-    Stack<Card> foundation = foundationPiles[index];
 
-    if (canPlaceOnFoundation(foundation, card)) {
-        wastePile.pop();
-        foundation.push(card);
-        foundationLabels[index].setIcon(CardImageLoader.getCardImage(card));
-        foundationLabels[index].setOpaque(true);
-        foundationLabels[index].setBackground(Color.WHITE);
-        wasteLabel.setText(wastePile.isEmpty() ? "" : wastePile.peek().toDisplayString());
-    }
-}
-private void handleTableauCardDrop(Card card, JLabel label) {
-    if (draggedCard == null || draggedLabel == null) return;
-
-    Point dropPoint = MouseInfo.getPointerInfo().getLocation();
-
-    // 嘗試拖到 Foundation
-    for (int i = 0; i < 4; i++) {
-        Rectangle bounds = foundationLabels[i].getBounds();
-        Point location = foundationLabels[i].getLocationOnScreen();
-        Rectangle screenRect = new Rectangle(location.x, location.y, bounds.width, bounds.height);
-
-        if (screenRect.contains(dropPoint)) {
-            if (canPlaceOnFoundation(foundationPiles[i], card)) {
-                removeCardFromTableau(card);
-                foundationPiles[i].push(card);
-                foundationLabels[i].setIcon(CardImageLoader.getCardImage(card)); 
-                foundationLabels[i].setOpaque(true); 
-                foundationLabels[i].setBackground(Color.WHITE);
-                label.setVisible(false);
-                return;
-            }
-        }
-    }
-
-    // 嘗試拖到 Tableau 堆
-    for (int i = 0; i < tableau.size(); i++) {
-        List<Card> pile = tableau.get(i);
-        if (pile.isEmpty()) continue;
-
-        Component comp = getComponentAtTableau(i);
-        if (comp != null) {
-            Rectangle bounds = comp.getBounds();
-            Point location = comp.getLocationOnScreen();
-            Rectangle screenRect = new Rectangle(location.x, location.y, bounds.width, bounds.height);
-
-            if (screenRect.contains(dropPoint)) {
-                Card top = pile.get(pile.size() - 1);
-                if (canPlaceOnTableau(top, card)) {
-                    removeCardFromTableau(card);
-                    tableau.get(i).add(card);
-                    
-                    return;
-                }
-            }
-        }
-    }
-}
-private void removeCardFromTableau(Card card) {
-    for (List<Card> pile : tableau) {
-        if (!pile.isEmpty() && pile.get(pile.size() - 1) == card) {
-            pile.remove(card);
-            if (!pile.isEmpty()) {
-                Card newTop = pile.get(pile.size() - 1);
-                if (!newTop.isFaceUp()) {
-                    newTop.flip(); // ✅ 翻開下一張牌
-                }
-            }
-            break;
-        }
-    }
-
-    refreshUI(); // ✅ 更新畫面顯示（見下一步）
-}
 private void refreshUI() {
     tableauPanel.removeAll();  // 只清空 tableau 的內容
     tableauPanel.revalidate();
@@ -726,6 +650,7 @@ private void checkGameWin() {
 
         if (choice == JOptionPane.YES_OPTION) {
             restartGame();
+            SfxAndBgm.playBgm();
         } else {
             System.exit(0);
         }
