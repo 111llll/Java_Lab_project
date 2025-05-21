@@ -529,8 +529,6 @@ private void removeCardsFromTableau(List<Card> cards) {
     }
 }
 
-
-
 private void refreshUI() {
     tableauPanel.removeAll();  // 只清空 tableau 的內容
     tableauPanel.revalidate();
