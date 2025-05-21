@@ -384,6 +384,7 @@ public class SolitaireGUI extends JFrame {
                 - 牌堆中的牌可以紅黑交錯遞減放置。
                 -  K 可以拖移到牌堆中的空白欄位。
                 - 所有花色都湊齊 A 至 K 則獲勝！
+                
                 """;
             JOptionPane.showMessageDialog(this, rules, "遊戲說明", JOptionPane.INFORMATION_MESSAGE);
         });
