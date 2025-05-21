@@ -5,6 +5,8 @@ import java.util.Stack;
 import java.util.ArrayList;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.awt.event.MouseEvent;
 
 public class SolitaireGUI extends JFrame {
     private final Deck deck;
@@ -20,6 +22,9 @@ public class SolitaireGUI extends JFrame {
     private JPanel tableauPanel;
     private List<Card> draggedStack = new ArrayList<>();
     private JLabel stockCountLabel;
+    private JWindow dragWindow;
+    private Point dragOffset;
+
 
     public SolitaireGUI() {
         setTitle("Solitaire - 單人接龍");
@@ -29,6 +34,7 @@ public class SolitaireGUI extends JFrame {
 
         deck = new Deck();
         tableau = new ArrayList<>();
+        SfxAndBgm.playBgm();
 
         for (int i = 0; i < 7; i++) {
             List<Card> pile = new ArrayList<>();
@@ -108,17 +114,48 @@ public class SolitaireGUI extends JFrame {
         wasteLabel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
         wasteLabel.setOpaque(true);
         wasteLabel.setBackground(Color.WHITE);
+        wasteLabel.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (dragWindow != null) {
+                    Point loc = e.getLocationOnScreen();
+                    dragWindow.setLocation(loc.x - dragOffset.x, loc.y - dragOffset.y);
+                }
+            }
+        });
+
         wasteLabel.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
                 if (!wastePile.isEmpty()) {
                     draggedCard = wastePile.peek();
                     draggedLabel = wasteLabel;
+                    draggedStack.clear();
+                    draggedStack.add(draggedCard);
+
+                    // 拖曳動畫開始
+                    dragWindow = new JWindow();
+                    dragWindow.setLayout(null);
+
+                    JLabel label = new JLabel(CardImageLoader.getCardImage(draggedCard));
+                    label.setBounds(0, 0, 80, 100);
+                    dragWindow.add(label);
+
+                    dragWindow.setSize(80, 100);
+                    dragOffset = e.getPoint();
+                    Point loc = e.getLocationOnScreen();
+                    dragWindow.setLocation(loc.x - dragOffset.x, loc.y - dragOffset.y);
+                    dragWindow.setVisible(true);
                 }
             }
 
             @Override
             public void mouseReleased(MouseEvent e) {
+                if (dragWindow != null) {
+                    dragWindow.setVisible(false);
+                    dragWindow.dispose();
+                    dragWindow = null;
+                }
                 Point dropPoint = e.getPoint();
                 SwingUtilities.convertPointToScreen(dropPoint, wasteLabel);
                 
@@ -134,7 +171,9 @@ public class SolitaireGUI extends JFrame {
                             foundationPiles[i].push(draggedCard);
                             foundationLabels[i].setIcon(CardImageLoader.getCardImage(draggedCard));
                             wasteLabel.setIcon(wastePile.isEmpty() ? null : CardImageLoader.getCardImage(wastePile.peek()));
+                            SfxAndBgm.playPlace();
                             updateStockCount();
+                            refreshUI();
                         }
                         draggedCard = null;
                         draggedLabel = null;
@@ -157,6 +196,7 @@ public class SolitaireGUI extends JFrame {
                                     wastePile.pop();
                                     pile.add(draggedCard);
                                     wasteLabel.setIcon(wastePile.isEmpty() ? null : CardImageLoader.getCardImage(wastePile.peek()));
+                                    SfxAndBgm.playPlace();
                                     updateStockCount();
                                     refreshUI();
                                     draggedCard = null;
@@ -182,6 +222,7 @@ public class SolitaireGUI extends JFrame {
                                     wastePile.pop();
                                     pile.add(draggedCard);
                                     wasteLabel.setIcon(wastePile.isEmpty() ? null : CardImageLoader.getCardImage(wastePile.peek()));
+                                    SfxAndBgm.playPlace();
                                     refreshUI();
                                     draggedCard = null;
                                     draggedLabel = null;
@@ -250,31 +291,64 @@ public class SolitaireGUI extends JFrame {
 
                 if (card.isFaceUp()) {
                     cardLabel.addMouseListener(new MouseAdapter() {
-                        @Override
-                        public void mousePressed(MouseEvent e) {
-                            draggedCard = card;
-                            draggedLabel = cardLabel;
-                            draggedStack.clear();
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        if (!card.isFaceUp()) return;
 
-                            // 找到此牌所在堆與位置
-                            for (List<Card> pile : tableau) {
-                                int index = pile.indexOf(card);
-                                if (index != -1) {
-                                    // 將 index 之後的所有牌加入 draggedStack
-                                    draggedStack.addAll(pile.subList(index, pile.size()));
-                                    break;
-                                }
+                        draggedCard = card;
+                        draggedLabel = cardLabel;
+                        draggedStack.clear();
+
+                        // 找到這張牌在哪一個 tableau
+                        for (List<Card> pile : tableau) {
+                            int idx = pile.indexOf(card);
+                            if (idx != -1) {
+                                draggedStack.addAll(pile.subList(idx, pile.size()));
+                                break;
                             }
                         }
 
-                        @Override
-                        public void mouseReleased(MouseEvent e) {
-                            handleTableauStackDrop(cardLabel);
-                            draggedCard = null;
-                            draggedLabel = null;
-                            draggedStack.clear();
+                        // 建立拖曳用的視窗
+                        dragWindow = new JWindow();
+                        dragWindow.setLayout(null);
+                        dragWindow.setSize(100, 100 + draggedStack.size() * 30);
+
+                        for (int i = 0; i < draggedStack.size(); i++) {
+                            Card c = draggedStack.get(i);
+                            JLabel img = new JLabel(CardImageLoader.getCardImage(c));
+                            img.setBounds(0, i * 30, 80, 100);
+                            dragWindow.add(img);
                         }
-                    });
+
+                        dragOffset = e.getPoint(); // 儲存點下去的位置偏移
+                        Point loc = e.getLocationOnScreen();
+                        dragWindow.setLocation(loc.x - dragOffset.x, loc.y - dragOffset.y);
+                        dragWindow.setVisible(true);
+                    }
+
+                    @Override
+                    public void mouseReleased(MouseEvent e) {
+                        if (dragWindow != null) {
+                            dragWindow.setVisible(false);
+                            dragWindow.dispose();
+                            dragWindow = null;
+                        }
+
+                        handleTableauStackDrop(draggedLabel); // 你原有的方法
+                        draggedCard = null;
+                        draggedLabel = null;
+                        draggedStack.clear();
+                    }
+                });
+                cardLabel.addMouseMotionListener(new MouseMotionAdapter() {
+                    @Override
+                    public void mouseDragged(MouseEvent e) {
+                        if (dragWindow != null) {
+                            Point loc = e.getLocationOnScreen();
+                            dragWindow.setLocation(loc.x - dragOffset.x, loc.y - dragOffset.y);
+                        }
+                    }
+                });
                 }
 
 
@@ -286,7 +360,8 @@ public class SolitaireGUI extends JFrame {
 
         add(container);
         JButton restartButton = new JButton("重新開始");
-        restartButton.setBounds(750, 20, 120, 30); // 放右上角
+        restartButton.setFocusPainted(false);
+        restartButton.setBounds(750, 20, 85, 30); // 放右上角
         container.add(restartButton);
 
         restartButton.addActionListener(e -> {
@@ -297,6 +372,22 @@ public class SolitaireGUI extends JFrame {
                 restartGame();
             }
         });
+        JButton helpButton = new JButton("遊戲說明");
+        helpButton.setFocusPainted(false);
+        helpButton.setBounds(650, 20, 85, 30);  // 在 restart 左邊
+        helpButton.addActionListener(e -> {
+            String rules = """
+                單人接龍規則說明：
+
+                - 在左上角牌庫點擊左右鍵可以翻牌
+                - 將所有牌依花色由 A 至 K 排到上方 4 個方格中。
+                - 牌堆中的牌可以紅黑交錯遞減放置。
+                -  K 可以拖移到牌堆中的空白欄位。
+                - 所有花色都湊齊 A 至 K 則獲勝！
+                """;
+            JOptionPane.showMessageDialog(this, rules, "遊戲說明", JOptionPane.INFORMATION_MESSAGE);
+        });
+        container.add(helpButton);
 
     }
 private void restartGame() {
@@ -363,6 +454,7 @@ private void handleTableauStackDrop(JLabel label) {
                     foundationLabels[i].setIcon(CardImageLoader.getCardImage(card));
                     foundationLabels[i].setOpaque(true);
                     foundationLabels[i].setBackground(Color.WHITE);
+                    SfxAndBgm.playPlace();
                     refreshUI();
                     return;
                 }
@@ -388,6 +480,7 @@ private void handleTableauStackDrop(JLabel label) {
                 if (canPlaceOnTableau(target, moving)) {
                     removeCardsFromTableau(draggedStack);
                     pile.addAll(draggedStack);
+                    SfxAndBgm.playPlace();
                     refreshUI();
                     return;
                 }
@@ -411,6 +504,7 @@ private void handleTableauStackDrop(JLabel label) {
                     if (top.getRank() == Card.Rank.KING) {
                         removeCardsFromTableau(draggedStack);
                         tableau.get(i).addAll(draggedStack);
+                        SfxAndBgm.playPlace();
                         refreshUI();
                         return;
                     }
@@ -539,27 +633,63 @@ private void refreshUI() {
                 cardLabel.addMouseListener(new MouseAdapter() {
                     @Override
                     public void mousePressed(MouseEvent e) {
+                        if (!card.isFaceUp()) return;
+
                         draggedCard = card;
                         draggedLabel = cardLabel;
                         draggedStack.clear();
 
-                        for (List<Card> p : tableau) {
-                            int idx = p.indexOf(card);
+                        // 找到這張牌在哪一個 tableau
+                        for (List<Card> pile : tableau) {
+                            int idx = pile.indexOf(card);
                             if (idx != -1) {
-                                draggedStack.addAll(p.subList(idx, p.size()));
+                                draggedStack.addAll(pile.subList(idx, pile.size()));
                                 break;
                             }
                         }
+
+                        // 建立拖曳用的視窗
+                        dragWindow = new JWindow();
+                        dragWindow.setLayout(null);
+                        dragWindow.setSize(100, 100 + draggedStack.size() * 30);
+
+                        for (int i = 0; i < draggedStack.size(); i++) {
+                            Card c = draggedStack.get(i);
+                            JLabel img = new JLabel(CardImageLoader.getCardImage(c));
+                            img.setBounds(0, i * 30, 80, 100);
+                            dragWindow.add(img);
+                        }
+
+                        dragOffset = e.getPoint(); // 儲存點下去的位置偏移
+                        Point loc = e.getLocationOnScreen();
+                        dragWindow.setLocation(loc.x - dragOffset.x, loc.y - dragOffset.y);
+                        dragWindow.setVisible(true);
                     }
 
                     @Override
                     public void mouseReleased(MouseEvent e) {
-                        handleTableauStackDrop(cardLabel);
+                        if (dragWindow != null) {
+                            dragWindow.setVisible(false);
+                            dragWindow.dispose();
+                            dragWindow = null;
+                        }
+
+                        handleTableauStackDrop(draggedLabel); // 你原有的方法
                         draggedCard = null;
                         draggedLabel = null;
                         draggedStack.clear();
                     }
                 });
+                cardLabel.addMouseMotionListener(new MouseMotionAdapter() {
+                    @Override
+                    public void mouseDragged(MouseEvent e) {
+                        if (dragWindow != null) {
+                            Point loc = e.getLocationOnScreen();
+                            dragWindow.setLocation(loc.x - dragOffset.x, loc.y - dragOffset.y);
+                        }
+                    }
+                });
+
             }
 
         }
@@ -582,6 +712,8 @@ private void checkGameWin() {
     }
 
     if (allComplete) {
+        SfxAndBgm.stopBgm();
+        SfxAndBgm.playEnd();
         int choice = JOptionPane.showOptionDialog(this,
                 "恭喜！你完成了遊戲！\n是否要重新開始？",
                 "遊戲結束",
